@@ -1,0 +1,28 @@
+version: "3.9"
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./packages/core:/app/core
+      - ./third_party:/app/third_party:ro
+      - ./packages/core/reports:/app/core/reports
+      - ./datasets:/app/datasets
+    environment:
+      - PYTHONUNBUFFERED=1
+    depends_on: []
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_BASE=http://localhost:8000
+    depends_on:
+      - api

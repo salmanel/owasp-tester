@@ -1,0 +1,85 @@
+# config.yaml - Mini-OWASP (local edition with external payloads)
+
+scanner:
+  user_agent: "MiniOWASP/1.1 (+https://github.com/salmanel/mini-owasp)"
+  timeout_seconds: 15
+  verify_ssl: true
+  follow_redirects: true
+  follow_redirect_hosts: true
+
+  same_host_only: true
+  max_depth: 2
+  max_pages: 100
+  delay_ms: 250
+  retries: 1
+  backoff_factor: 0.25
+
+  auth:
+    enabled: false
+    type: ""
+    credentials: {}
+
+  proxies: {}
+  allowed_hosts: []
+
+exclusions:
+  domains: []
+  paths:
+    - ".jpg"
+    - ".jpeg"
+    - ".png"
+    - ".gif"
+    - ".css"
+    - ".woff"
+    - ".woff2"
+    - ".ttf"
+    - ".svg"
+    - ".ico"
+    - ".pdf"
+    - ".zip"
+    - "mailto:"
+    - "javascript:"
+
+payloads:
+  # === Inline fast payloads (sanity tests) ===
+  xss_reflected:
+    - "<svg onload=alert(1)>"
+    - "\"><img src=x onerror=alert(1)>"
+    - "'\"><script>alert(1)</script>"
+  sqli_basic:
+    - "' OR '1'='1"
+    - "' UNION SELECT 1--"
+    - "\" OR 1=1--"
+
+  # === External payload sources ===
+  xss_files:
+    - "third_party/xss-payload-list/Intruder/xss-payload-list.txt"
+  sqli_files:
+    - "third_party/sql-injection-payload-list/Intruder/detect"
+    - "third_party/sql-injection-payload-list/Intruder/exploit"
+    - "third_party/sql-injection-payload-list/Intruder/payloads-sql-blind"
+
+  # === Limits for very large sets ===
+  max_test_payloads_per_param: 150
+
+headers_required:
+  - "Content-Security-Policy"
+  - "X-Content-Type-Options"
+  - "X-Frame-Options"
+  - "Referrer-Policy"
+  - "Strict-Transport-Security"
+
+report:
+  json: true
+  html: true
+  save_hashes: false
+
+safety:
+  allow_global_scan_flag: false
+
+javascript:
+  enabled: true
+  headless: true
+  nav_timeout_ms: 12000
+  run_timeout_ms: 4000
+  max_body_chars: 200000

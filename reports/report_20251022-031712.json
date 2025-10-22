@@ -1,0 +1,48 @@
+{
+  "target": "http://localhost:5173",
+  "pages": [
+    "http://localhost:5173/"
+  ],
+  "forms": {},
+  "crawled_pages": 1,
+  "discovered_forms": 0,
+  "findings": [
+    {
+      "severity": "INFO",
+      "category": "Headers",
+      "url": "http://localhost:5173/",
+      "param": "-",
+      "evidence": "Missing header: Content-Security-Policy"
+    },
+    {
+      "severity": "INFO",
+      "category": "Headers",
+      "url": "http://localhost:5173/",
+      "param": "-",
+      "evidence": "Missing header: X-Content-Type-Options"
+    },
+    {
+      "severity": "INFO",
+      "category": "Headers",
+      "url": "http://localhost:5173/",
+      "param": "-",
+      "evidence": "Missing header: X-Frame-Options"
+    },
+    {
+      "severity": "INFO",
+      "category": "Headers",
+      "url": "http://localhost:5173/",
+      "param": "-",
+      "evidence": "Missing header: Referrer-Policy"
+    },
+    {
+      "severity": "INFO",
+      "category": "Headers",
+      "url": "http://localhost:5173/",
+      "param": "-",
+      "evidence": "Missing header: Strict-Transport-Security"
+    }
+  ],
+  "started_at": 1761099432.6243076,
+  "finished_at": 1761099432.9558063
+}

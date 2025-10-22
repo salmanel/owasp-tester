@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+
+# Reports & datasets
+packages/core/reports/
+datasets/
+*.sqlite
+
+# Node / Vite
+node_modules/
+dist/
+*.log
+
+# Playwright cache
+ms-playwright/
+
+# OS cruft
+.DS_Store
+Thumbs.db

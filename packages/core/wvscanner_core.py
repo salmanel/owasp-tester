@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
-# packages/core/wvscanner_core.py
 """
-Mini OWASP Web Scanner (Core) — v1.5
-- JS-aware crawler (optional Playwright rendering) with SPA canonicalization
-- Modules: reflected XSS (basic + DOM-aware), SQLi (basic), Security headers
-- Reporting: JSON + HTML (HTML includes Forms section)
-- External payloads via config: payloads.xss_files / payloads.sqli_files
-- AI-ready: merges payloads from Static + AI providers with caps
+Mini OWASP Web Scanner (Core) — v1.5 (package-compat)
+- Crawler (HTML + optional Playwright JS rendering)
+- Modules: reflected XSS (basic + DOM optional), SQLi (basic), Security headers
+- Reporter: JSON + HTML
+- load_config(): YAML loader for backend use
 
-NOTE: Use only on assets you own or have explicit permission to test.
+NOTE: For educational use on assets you own / are allowed to test.
 """
 
 from __future__ import annotations
@@ -29,9 +27,15 @@ from urllib3.util import Retry
 from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
 import warnings
 
-# Providers (new)
-from payloads.providers.static_provider import StaticPayloadProvider
-from payloads.providers.ai_provider_stub import AIPayloadProvider
+# NEW: YAML config loader for backend
+try:
+    import yaml  # PyYAML
+except Exception:
+    yaml = None
+
+# Relative imports (fixed)
+from .payloads.providers.static_provider import StaticPayloadProvider
+from .payloads.providers.ai_provider_stub import AIPayloadProvider
 
 warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 
@@ -59,6 +63,24 @@ class ScanResult:
     findings: List[Finding]
     started_at: float
     finished_at: float
+
+
+# -------------------------
+# Config helper (NEW)
+# -------------------------
+def load_config(path: str) -> Dict[str, Any]:
+    """Load YAML config; returns {} if missing or PyYAML not available."""
+    if not yaml:
+        log.warning("PyYAML not installed; load_config returning empty config.")
+        return {}
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            cfg = yaml.safe_load(f) or {}
+        log.debug("Loaded config from %s", path)
+        return cfg
+    except Exception as e:
+        log.warning("Failed reading config %s: %s (using empty config)", path, e)
+        return {}
 
 
 # -------------------------
@@ -104,7 +126,6 @@ def normalize_slash_path(path: str) -> str:
     return norm
 
 def canonicalize_spa(u: str, start_origin: str, start_path: str) -> str:
-    """Make hash-routes look like canonical paths under the app's base path."""
     p = urlparse.urlsplit(u)
     frag = p.fragment or ""
     path = normalize_slash_path(p.path)
@@ -143,7 +164,6 @@ def make_session(user_agent: str,
     s.headers.update({"User-Agent": user_agent})
     s.verify = verify_ssl
     s.allow_redirects = follow_redirects
-    # custom attribute used by our code
     s.request_timeout = timeout
 
     retry = Retry(
@@ -163,13 +183,15 @@ def make_session(user_agent: str,
 
 
 # -------------------------
-# Playwright DOM renderer helpers (optional)
+# Optional JS rendering integration
 # -------------------------
 def _try_render_with_js(js_cfg: Dict, url: str):
+    """Attempt to render page with Playwright, return result or None."""
     try:
-        from js_renderer import js_context, render_url
+        # relative import to our module
+        from .js_renderer import js_context, render_url
     except Exception:
-        return None  # Playwright not available
+        return None
     headless = bool(js_cfg.get("headless", True))
     nav_timeout = int(js_cfg.get("nav_timeout_ms", 12000))
     run_timeout = int(js_cfg.get("run_timeout_ms", 4000))
@@ -182,7 +204,7 @@ def _try_render_with_js(js_cfg: Dict, url: str):
 
 
 # -------------------------
-# JS-aware CRAWLER with SPA canonicalization
+# Crawler
 # -------------------------
 def crawl(start_url: str,
           session: requests.Session,
@@ -196,11 +218,6 @@ def crawl(start_url: str,
           max_pages: int,
           delay_ms: int,
           js_cfg: Optional[Dict] = None) -> Tuple[List[str], Dict[str, List[Dict[str, str]]]]:
-    """
-    Returns:
-      pages: list of unique page URLs visited (canonicalized)
-      forms: mapping URL -> list of forms (each: {action, method, inputs: dict})
-    """
     pages: List[str] = []
     forms: Dict[str, List[Dict[str, str]]] = {}
     visited_keys: Set[str] = set()
@@ -217,7 +234,7 @@ def crawl(start_url: str,
     js_browser = None
     if use_js:
         try:
-            from js_renderer import js_context
+            from .js_renderer import js_context  # relative
             js_browser_ctx = js_context(headless=bool(js_cfg.get("headless", True)))
             js_browser = js_browser_ctx.__enter__()
             log.debug("JS renderer (Playwright) initialized.")
@@ -273,7 +290,7 @@ def crawl(start_url: str,
         js_forms: List[Dict[str, str]] = []
         if js_browser is not None:
             try:
-                from js_renderer import render_url
+                from .js_renderer import render_url  # relative
                 nav_timeout_ms = int(js_cfg.get("nav_timeout_ms", 12000))
                 run_timeout_ms = int(js_cfg.get("run_timeout_ms", 4000))
                 max_body_chars = int(js_cfg.get("max_body_chars", 200000))
@@ -281,13 +298,13 @@ def crawl(start_url: str,
                 rendered_html = result.html or ""
                 js_links = result.links or []
                 js_forms = result.forms or []
+                log.debug("Rendered %s (len=%s)", url, len(rendered_html))
             except Exception:
                 rendered_html = None
 
         dom_html = rendered_html if rendered_html else raw_html
         soup = BeautifulSoup(dom_html, "lxml")
 
-        # forms from Playwright heuristic first
         page_forms: List[Dict[str, str]] = []
         for jf in js_forms:
             action = jf.get("action") or url
@@ -296,7 +313,6 @@ def crawl(start_url: str,
             if inputs:
                 page_forms.append({"action": action, "method": method, "inputs": inputs})
 
-        # then parse static forms
         for form in soup.find_all("form"):
             method = (form.get("method") or "get").lower()
             action = form.get("action") or url
@@ -323,7 +339,6 @@ def crawl(start_url: str,
         if page_forms:
             forms[url] = page_forms
 
-        # collect links
         link_candidates: List[str] = []
         if js_links:
             link_candidates.extend(js_links)
@@ -366,7 +381,7 @@ def crawl(start_url: str,
 
 
 # -------------------------
-# Modules: XSS (reflected), SQLi (basic), Headers, DOM-XSS (basic)
+# Modules: XSS, DOM XSS (optional), SQLi, Headers
 # -------------------------
 def test_reflected_xss(session: requests.Session, url: str, param: str, payloads: List[str], cap: Optional[int] = None) -> Optional[Finding]:
     tested = 0
@@ -388,7 +403,7 @@ def test_reflected_xss(session: requests.Session, url: str, param: str, payloads
 
 def test_dom_xss_with_js(url: str, param: str, payloads: List[str], js_cfg: Dict) -> Optional[Finding]:
     try:
-        from js_renderer import js_context, render_url
+        from .js_renderer import js_context, render_url  # relative
     except Exception:
         return None
 
@@ -451,8 +466,10 @@ def test_sqli_basic(session: requests.Session, url: str, param: str, payloads: L
             r = session.get(strip_hash(url_mod), timeout=session.request_timeout)
             body = (r.text or "")[:5000].lower()
             if any(sig in body for sig in error_signatures):
+                log.info("SQLi signature matched for %s param=%s", url_mod, param)
                 return Finding("HIGH", "SQLi", url_mod, param, f"Error-based signature with payload: {p}")
             if baseline and abs(len(r.text or "") - len(baseline)) > 500:
+                log.info("SQLi response-length delta for %s param=%s", url_mod, param)
                 return Finding("MEDIUM", "SQLi", url_mod, param, f"Response length changed with payload: {p}")
         except Exception:
             continue
@@ -483,10 +500,8 @@ def run_scan(target: str, cfg: Dict) -> ScanResult:
     js_cfg = cfg.get("javascript", {}) or {}
     ai_cfg = cfg.get("ai", {}) or {}
 
-    # Merge payloads via providers
     prov_static = StaticPayloadProvider(payloads_cfg)
-    prov_ai = AIPayloadProvider(cfg)  # returns empty unless ai.enabled=true later
-    # Build context (can be expanded later: DOM signals, target hints, etc.)
+    prov_ai = AIPayloadProvider(cfg)
     provider_context = {
         "target": target,
         "use_js_dom_signals": bool(ai_cfg.get("context", {}).get("use_js_dom_signals", True)),
@@ -494,14 +509,13 @@ def run_scan(target: str, cfg: Dict) -> ScanResult:
     }
     xss_payloads = prov_static.get_xss_payloads(provider_context) + prov_ai.get_xss_payloads(provider_context)
     sqli_payloads = prov_static.get_sqli_payloads(provider_context) + prov_ai.get_sqli_payloads(provider_context)
-    # Respect caps
+
     cap = payloads_cfg.get("max_test_payloads_per_param")
     per_param_cap = int(cap) if isinstance(cap, int) and cap > 0 else None
     if per_param_cap is not None:
         xss_payloads = xss_payloads[:per_param_cap]
         sqli_payloads = sqli_payloads[:per_param_cap]
 
-    # Enforce same_host_only unless explicitly allowed by safety.flag
     same_host_only_cfg = bool(s_cfg.get("same_host_only", True))
     if not same_host_only_cfg and not cfg.get("safety", {}).get("allow_global_scan_flag", False):
         same_host_only_cfg = True
@@ -546,7 +560,6 @@ def run_scan(target: str, cfg: Dict) -> ScanResult:
 
     findings: List[Finding] = []
 
-    # Header checks for unique base URLs (no hash)
     base_urls: Set[str] = set(strip_hash(u) for u in pages)
     for u in sorted(base_urls):
         try:
@@ -557,7 +570,6 @@ def run_scan(target: str, cfg: Dict) -> ScanResult:
 
     js_enabled = bool(js_cfg.get("enabled", False))
 
-    # GET param tests (XSS + SQLi) for URLs with queries
     for u in pages:
         try:
             parsed = urlparse.urlsplit(u)
@@ -565,7 +577,6 @@ def run_scan(target: str, cfg: Dict) -> ScanResult:
             if not qs:
                 continue
 
-            # XSS
             for param in qs:
                 fx = test_reflected_xss(session, u, param, xss_payloads, per_param_cap)
                 if fx:
@@ -576,7 +587,6 @@ def run_scan(target: str, cfg: Dict) -> ScanResult:
                     if fdom:
                         findings.append(fdom)
 
-            # SQLi
             for param in qs:
                 fs = test_sqli_basic(session, u, param, sqli_payloads, per_param_cap)
                 if fs:

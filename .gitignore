@@ -1,93 +1,31 @@
-# =========================
-# Python & Environment
-# =========================
+# node
+node_modules/
+**/node_modules/
+dist/
+build/
+.vite/
+.cache/
+
+# python
 __pycache__/
-*.py[cod]
+*.pyc
 *.pyo
 *.pyd
-*.so
-*.log
-*.sqlite3
-.env
+.python-version
 .venv/
-venv/
-ENV/
-env.bak/
-pythonenv*
-build/
-dist/
-*.egg-info/
-.eggs/
+.venv*/
 
-# =========================
-# Reports / Generated Data
-# =========================
-packages/core/reports/
-*.json
-*.html
-!templates/
-*.csv
-*.tmp
-*.bak
+# env/secrets
+.env
+.env.*
+!.env.example
 
-# =========================
-# Node / Frontend
-# =========================
-packages/frontend/node_modules/
-packages/frontend/.env
-packages/frontend/.next/
-packages/frontend/dist/
-packages/frontend/.vite/
-packages/frontend/npm-debug.log*
-packages/frontend/yarn-debug.log*
-packages/frontend/yarn-error.log*
-packages/frontend/.eslintcache
-packages/frontend/.parcel-cache
-packages/frontend/.turbo
+# reports
+reports/*
+!reports/.gitkeep
 
-# =========================
-# IDE / OS Files
-# =========================
-.vscode/
-.idea/
-*.swp
-*.swo
+# OS/editor
 .DS_Store
 Thumbs.db
-desktop.ini
-
-# =========================
-# Playwright / Test Cache
-# =========================
-playwright-report/
-test-results/
-packages/core/playwright_logs/
-
-# =========================
-# Docker / Local Deploy
-# =========================
-*.pid
-*.log
-*.db
-docker-compose.override.yml
-*.tar
-*.gz
-
-# =========================
-# Security / Sensitive Files
-# =========================
-config.local.yaml
-secrets/
-keys/
-*.pem
-*.crt
-*.key
-*.token
-
-# =========================
-# AI / Experimental
-# =========================
-packages/ai/models/
-packages/ai/outputs/
-datasets/
-checkpoints/
+.idea/
+.vscode/

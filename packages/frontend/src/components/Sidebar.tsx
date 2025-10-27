@@ -11,6 +11,7 @@ interface SidebarProps {
 
 export function Sidebar({ activeView, onViewChange }: SidebarProps) {
   const { sidebarCollapsed, mode } = useAppStore();
+  const isAdvancedMode = mode === 'advanced';
 
   const navItems = [
     { id: 'soft', label: 'Soft Mode', icon: ShieldIcon },
@@ -22,7 +23,7 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
   return (
     <aside
       className={cn(
-        'bg-secondary border-r border-border h-[calc(100vh-4rem)] flex flex-col transition-all duration-300 ease-in-out',
+        `${isAdvancedMode ? 'bg-[hsl(0,0%,5%)] border-tertiary/30' : 'bg-secondary border-border'} border-r h-[calc(100vh-4rem)] flex flex-col transition-all duration-300 ease-in-out`,
         sidebarCollapsed ? 'w-0 lg:w-20' : 'w-64',
         'fixed lg:sticky top-16 left-0 z-40 overflow-hidden'
       )}
@@ -31,8 +32,6 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeView === item.id;
-          const accentColor = mode === 'soft' ? 'accent' : 'tertiary';
-
           return (
             <Button
               key={item.id}
@@ -40,8 +39,12 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
               className={cn(
                 'w-full justify-start gap-3 font-normal',
                 isActive
-                  ? `bg-${accentColor} text-${accentColor}-foreground hover:bg-${accentColor}/90`
-                  : 'bg-transparent text-navbar-text hover:bg-primary hover:text-primary-foreground',
+                  ? isAdvancedMode 
+                    ? 'bg-tertiary text-tertiary-foreground hover:bg-tertiary/90'
+                    : 'bg-accent text-accent-foreground hover:bg-accent/90'
+                  : isAdvancedMode
+                    ? 'bg-transparent text-navbar-text hover:bg-tertiary/20 hover:text-gray-100'
+                    : 'bg-transparent text-navbar-text hover:bg-primary hover:text-primary-foreground',
                 sidebarCollapsed && 'lg:justify-center'
               )}
               onClick={() => onViewChange(item.id)}
@@ -59,7 +62,10 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
         <Button
           variant="ghost"
           className={cn(
-            'w-full justify-start gap-3 font-normal bg-transparent text-navbar-text hover:bg-primary hover:text-primary-foreground',
+            'w-full justify-start gap-3 font-normal bg-transparent text-navbar-text',
+            isAdvancedMode 
+              ? 'hover:bg-tertiary/20 hover:text-gray-100'
+              : 'hover:bg-primary hover:text-primary-foreground',
             sidebarCollapsed && 'lg:justify-center'
           )}
         >
@@ -69,12 +75,15 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
         <Button
           variant="ghost"
           className={cn(
-            'w-full justify-start gap-3 font-normal bg-transparent text-navbar-text hover:bg-primary hover:text-primary-foreground',
+            'w-full justify-start gap-3 font-normal bg-transparent text-navbar-text',
+            isAdvancedMode 
+              ? 'hover:bg-tertiary/20 hover:text-gray-100'
+              : 'hover:bg-primary hover:text-primary-foreground',
             sidebarCollapsed && 'lg:justify-center'
           )}
         >
           <SettingsIcon className="w-5 h-5 flex-shrink-0" strokeWidth={1.5} />
-          {!sidebarCollapsed && <span>SettingsIcon</span>}
+          {!sidebarCollapsed && <span>Settings</span>}
         </Button>
       </div>
     </aside>

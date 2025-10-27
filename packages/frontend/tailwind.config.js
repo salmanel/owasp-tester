@@ -25,7 +25,7 @@ module.exports = {
           foreground: "hsl(0, 0%, 98%)",
         },
         neutral: {
-          DEFAULT: "hsl(220, 10%, 10%)",
+          DEFAULT: "hsl(0, 0%, 5%)",
           foreground: "hsl(0, 0%, 96%)",
         },
         destructive: {
@@ -45,8 +45,8 @@ module.exports = {
           foreground: "hsl(0, 0%, 98%)",
         },
         card: {
-          DEFAULT: "hsl(210, 50%, 15%)",
-          foreground: "hsl(200, 100%, 95%)",
+          DEFAULT: "hsl(0, 0%, 10%)",
+          foreground: "hsl(0, 0%, 95%)",
         },
         success: "hsl(145, 60%, 45%)",
         warning: "hsl(40, 95%, 55%)",

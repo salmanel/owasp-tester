@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { PlayIcon, ShieldIcon } from 'lucide-react';
+import { PlayIcon, ShieldIcon, FileTextIcon, DownloadIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -103,14 +103,90 @@ export function SoftPanel() {
             </Select>
           </div>
 
-          <Button
-            onClick={handleRunTest}
-            disabled={isTestRunning}
-            className="w-full bg-accent text-accent-foreground hover:bg-accent/90 font-medium"
-          >
-            <PlayIcon className="w-5 h-5 mr-2" strokeWidth={1.5} />
-            {isTestRunning ? 'Running Test...' : 'Run Test'}
-          </Button>
+          <div className="space-y-3">
+            <Button
+              onClick={handleRunTest}
+              disabled={isTestRunning}
+              className="w-full bg-accent text-accent-foreground hover:bg-accent/90 font-medium"
+            >
+              <PlayIcon className="w-5 h-5 mr-2" strokeWidth={1.5} />
+              {isTestRunning ? 'Running Test...' : 'Run Test'}
+            </Button>
+
+            {!isTestRunning && results.length > 0 && (
+              <div className="grid grid-cols-2 gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    // Generate HTML report
+                    const htmlContent = `
+                      <!DOCTYPE html>
+                      <html>
+                        <head>
+                          <title>OWASP Test Report</title>
+                          <style>
+                            body { font-family: Arial, sans-serif; padding: 20px; background: #1a1a1a; color: #fff; }
+                            h1 { color: #3b82f6; }
+                            .vulnerability { background: #2a2a2a; padding: 15px; margin: 10px 0; border-radius: 8px; border-left: 4px solid #ef4444; }
+                            .severity { display: inline-block; padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+                            .critical { background: #dc2626; }
+                            .high { background: #ef4444; }
+                            .medium { background: #f59e0b; }
+                            .low { background: #10b981; }
+                          </style>
+                        </head>
+                        <body>
+                          <h1>OWASP Security Test Report</h1>
+                          <p>Generated: ${new Date().toLocaleString()}</p>
+                          <p>Total Vulnerabilities: ${results.length}</p>
+                          <hr>
+                          ${results.map(r => `
+                            <div class="vulnerability">
+                              <h3>${r.vulnerability} <span class="severity ${r.severity}">${r.severity.toUpperCase()}</span></h3>
+                              <p><strong>URL:</strong> ${r.url}</p>
+                              ${r.payload ? `<p><strong>Payload:</strong> <code>${r.payload}</code></p>` : ''}
+                              <p><strong>Detected:</strong> ${new Date(r.timestamp).toLocaleString()}</p>
+                            </div>
+                          `).join('')}
+                        </body>
+                      </html>
+                    `;
+                    const blob = new Blob([htmlContent], { type: 'text/html' });
+                    const url = URL.createObjectURL(blob);
+                    window.open(url, '_blank');
+                  }}
+                  className="bg-transparent border-accent text-accent hover:bg-accent hover:text-accent-foreground"
+                >
+                  <FileTextIcon className="w-4 h-4 mr-2" strokeWidth={1.5} />
+                  View HTML Report
+                </Button>
+
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    // Download JSON report
+                    const jsonReport = {
+                      generatedAt: new Date().toISOString(),
+                      mode: 'soft',
+                      totalVulnerabilities: results.length,
+                      vulnerabilities: results
+                    };
+                    const blob = new Blob([JSON.stringify(jsonReport, null, 2)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `owasp-report-${Date.now()}.json`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  }}
+                  className="bg-transparent border-accent text-accent hover:bg-accent hover:text-accent-foreground"
+                >
+                  <DownloadIcon className="w-4 h-4 mr-2" strokeWidth={1.5} />
+                  Download JSON
+                </Button>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 

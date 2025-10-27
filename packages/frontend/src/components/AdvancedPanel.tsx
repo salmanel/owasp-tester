@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { PlayIcon, ShieldAlertIcon, SettingsIcon } from 'lucide-react';
+import { PlayIcon, ShieldAlertIcon, SettingsIcon, FileTextIcon, DownloadIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,7 +18,7 @@ export function AdvancedPanel() {
   const [followRedirects, setFollowRedirects] = useState(true);
   const [crawlDepth, setCrawlDepth] = useState('1');
   const [timeout, setTimeout] = useState('30');
-  const { addResults, setTestRunning, isTestRunning, setMode } = useAppStore();
+  const { results, addResults, setTestRunning, isTestRunning, setMode } = useAppStore();
   const { toast } = useToast();
 
   const handleRunTest = () => {
@@ -77,9 +77,9 @@ export function AdvancedPanel() {
         </p>
       </div>
 
-      <Card className="bg-card border-border">
+      <Card className="bg-[hsl(0,0%,8%)] border-tertiary/30">
         <CardHeader>
-          <CardTitle className="text-card-foreground flex items-center gap-2">
+          <CardTitle className="text-gray-100 flex items-center gap-2">
             <SettingsIcon className="w-5 h-5" strokeWidth={1.5} />
             Advanced Configuration
           </CardTitle>
@@ -89,7 +89,7 @@ export function AdvancedPanel() {
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-2">
-            <Label htmlFor="adv-target-url" className="text-primary-foreground">
+            <Label htmlFor="adv-target-url" className="text-gray-100">
               Target URL
             </Label>
             <Input
@@ -98,22 +98,22 @@ export function AdvancedPanel() {
               placeholder="https://example.com"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              className="bg-primary border-border text-primary-foreground placeholder:text-gray-500"
+              className="bg-[hsl(0,0%,12%)] border-tertiary/30 text-gray-100 placeholder:text-gray-500 focus-visible:ring-tertiary"
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="adv-attack-type" className="text-primary-foreground">
+            <Label htmlFor="adv-attack-type" className="text-gray-100">
               Attack Vector
             </Label>
             <Select value={attackType} onValueChange={setAttackType}>
               <SelectTrigger
                 id="adv-attack-type"
-                className="bg-primary border-border text-primary-foreground"
+                className="bg-[hsl(0,0%,12%)] border-tertiary/30 text-gray-100 focus:ring-tertiary"
               >
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-[hsl(0,0%,8%)] border-tertiary/30">
                 <SelectItem value="all">All Vectors</SelectItem>
                 <SelectItem value="xss">XSS (All Variants)</SelectItem>
                 <SelectItem value="sqli">SQL Injection (All Types)</SelectItem>
@@ -127,7 +127,7 @@ export function AdvancedPanel() {
           <Separator className="bg-border" />
 
           <div className="space-y-2">
-            <Label htmlFor="custom-payloads" className="text-primary-foreground">
+            <Label htmlFor="custom-payloads" className="text-gray-100">
               Custom Payloads (one per line)
             </Label>
             <Textarea
@@ -135,7 +135,7 @@ export function AdvancedPanel() {
               placeholder="<script>alert(document.cookie)</script>&#10;' OR '1'='1&#10;{{7*7}}"
               value={customPayloads}
               onChange={(e) => setCustomPayloads(e.target.value)}
-              className="bg-primary border-border text-primary-foreground placeholder:text-gray-500 font-mono text-sm min-h-32"
+              className="bg-[hsl(0,0%,12%)] border-tertiary/30 text-gray-100 placeholder:text-gray-500 font-mono text-sm min-h-32 focus-visible:ring-tertiary"
             />
           </div>
 
@@ -143,17 +143,17 @@ export function AdvancedPanel() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <Label htmlFor="crawl-depth" className="text-primary-foreground">
+              <Label htmlFor="crawl-depth" className="text-gray-100">
                 Crawl Depth
               </Label>
               <Select value={crawlDepth} onValueChange={setCrawlDepth}>
                 <SelectTrigger
                   id="crawl-depth"
-                  className="bg-primary border-border text-primary-foreground"
+                  className="bg-[hsl(0,0%,12%)] border-tertiary/30 text-gray-100 focus:ring-tertiary"
                 >
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-[hsl(0,0%,8%)] border-tertiary/30">
                   <SelectItem value="1">1 Level</SelectItem>
                   <SelectItem value="2">2 Levels</SelectItem>
                   <SelectItem value="3">3 Levels</SelectItem>
@@ -163,7 +163,7 @@ export function AdvancedPanel() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="timeout" className="text-primary-foreground">
+              <Label htmlFor="timeout" className="text-gray-100">
                 Timeout (seconds)
               </Label>
               <Input
@@ -171,14 +171,14 @@ export function AdvancedPanel() {
                 type="number"
                 value={timeout}
                 onChange={(e) => setTimeout(e.target.value)}
-                className="bg-primary border-border text-primary-foreground"
+                className="bg-[hsl(0,0%,12%)] border-tertiary/30 text-gray-100 focus-visible:ring-tertiary"
               />
             </div>
           </div>
 
-          <div className="flex items-center justify-between p-4 bg-primary rounded-lg border border-border">
+          <div className="flex items-center justify-between p-4 bg-[hsl(0,0%,12%)] rounded-lg border border-tertiary/30">
             <div className="space-y-1">
-              <Label htmlFor="follow-redirects" className="text-primary-foreground font-medium">
+              <Label htmlFor="follow-redirects" className="text-gray-100 font-medium">
                 Follow Redirects
               </Label>
               <p className="text-sm text-gray-400">
@@ -192,14 +192,106 @@ export function AdvancedPanel() {
             />
           </div>
 
-          <Button
-            onClick={handleRunTest}
-            disabled={isTestRunning}
-            className="w-full bg-tertiary text-tertiary-foreground hover:bg-tertiary/90 font-medium"
-          >
-            <PlayIcon className="w-5 h-5 mr-2" strokeWidth={1.5} />
-            {isTestRunning ? 'Running Advanced Test...' : 'Run Advanced Test'}
-          </Button>
+          <div className="space-y-3">
+            <Button
+              onClick={handleRunTest}
+              disabled={isTestRunning}
+              className="w-full bg-tertiary text-tertiary-foreground hover:bg-tertiary/90 font-medium"
+            >
+              <PlayIcon className="w-5 h-5 mr-2" strokeWidth={1.5} />
+              {isTestRunning ? 'Running Advanced Test...' : 'Run Advanced Test'}
+            </Button>
+
+            {!isTestRunning && results.length > 0 && (
+              <div className="grid grid-cols-2 gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    // Generate HTML report
+                    const htmlContent = `
+                      <!DOCTYPE html>
+                      <html>
+                        <head>
+                          <title>OWASP Advanced Test Report</title>
+                          <style>
+                            body { font-family: Arial, sans-serif; padding: 20px; background: #0a0a0a; color: #fff; }
+                            h1 { color: #dc2626; }
+                            .vulnerability { background: #1a1a1a; padding: 15px; margin: 10px 0; border-radius: 8px; border-left: 4px solid #dc2626; }
+                            .severity { display: inline-block; padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+                            .critical { background: #dc2626; }
+                            .high { background: #ef4444; }
+                            .medium { background: #f59e0b; }
+                            .low { background: #10b981; }
+                            .config { background: #1a1a1a; padding: 15px; margin: 20px 0; border-radius: 8px; }
+                          </style>
+                        </head>
+                        <body>
+                          <h1>OWASP Advanced Security Test Report</h1>
+                          <p>Generated: ${new Date().toLocaleString()}</p>
+                          <div class="config">
+                            <h3>Test Configuration</h3>
+                            <p><strong>Attack Type:</strong> ${attackType}</p>
+                            <p><strong>Crawl Depth:</strong> ${crawlDepth} levels</p>
+                            <p><strong>Timeout:</strong> ${timeout}s</p>
+                            <p><strong>Follow Redirects:</strong> ${followRedirects ? 'Yes' : 'No'}</p>
+                            ${customPayloads ? `<p><strong>Custom Payloads:</strong> ${customPayloads.split('\n').length} payloads</p>` : ''}
+                          </div>
+                          <p>Total Vulnerabilities: ${results.length}</p>
+                          <hr>
+                          ${results.map(r => `
+                            <div class="vulnerability">
+                              <h3>${r.vulnerability} <span class="severity ${r.severity}">${r.severity.toUpperCase()}</span></h3>
+                              <p><strong>URL:</strong> ${r.url}</p>
+                              ${r.payload ? `<p><strong>Payload:</strong> <code>${r.payload}</code></p>` : ''}
+                              <p><strong>Detected:</strong> ${new Date(r.timestamp).toLocaleString()}</p>
+                            </div>
+                          `).join('')}
+                        </body>
+                      </html>
+                    `;
+                    const blob = new Blob([htmlContent], { type: 'text/html' });
+                    const url = URL.createObjectURL(blob);
+                    window.open(url, '_blank');
+                  }}
+                  className="bg-transparent border-tertiary text-tertiary hover:bg-tertiary hover:text-tertiary-foreground"
+                >
+                  <FileTextIcon className="w-4 h-4 mr-2" strokeWidth={1.5} />
+                  View HTML Report
+                </Button>
+
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    // Download JSON report
+                    const jsonReport = {
+                      generatedAt: new Date().toISOString(),
+                      mode: 'advanced',
+                      configuration: {
+                        attackType,
+                        crawlDepth: parseInt(crawlDepth),
+                        timeout: parseInt(timeout),
+                        followRedirects,
+                        customPayloads: customPayloads ? customPayloads.split('\n') : []
+                      },
+                      totalVulnerabilities: results.length,
+                      vulnerabilities: results
+                    };
+                    const blob = new Blob([JSON.stringify(jsonReport, null, 2)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `owasp-advanced-report-${Date.now()}.json`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  }}
+                  className="bg-transparent border-tertiary text-tertiary hover:bg-tertiary hover:text-tertiary-foreground"
+                >
+                  <DownloadIcon className="w-4 h-4 mr-2" strokeWidth={1.5} />
+                  Download JSON
+                </Button>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>

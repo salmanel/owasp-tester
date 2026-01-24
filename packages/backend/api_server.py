@@ -1,171 +1,154 @@
 #!/usr/bin/env python3
+"""
+FastAPI Backend for OWASP-Tester
+- Start scans in background
+- Expose status + absolute report links
+- Serve reports statically at /reports
+"""
+
 from __future__ import annotations
 
-import asyncio
-import json
 import os
-import time
 import uuid
-from typing import Dict, List, Optional
+from pathlib import Path
+from typing import Dict, Any
 
-import orjson
-import yaml
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, HTMLResponse, PlainTextResponse, StreamingResponse
-from pydantic import BaseModel, Field
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
-# import scanner core from sibling package
-import sys
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", "core"))
-import wvscanner_core as core  # noqa: E402
+# Import scanner core (run + save + load config)
+from packages.core.wvscanner_core import run_scan, save_report, load_config
 
-API_TITLE = "Mini-OWASP API"
-FRONTEND_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
+# --------------------------------------------------------------------------------------
+# Paths
+# --------------------------------------------------------------------------------------
+# repo root: .../owasp-tester/
+BASE_DIR = Path(__file__).resolve().parents[2]
+CORE_DIR = BASE_DIR / "packages" / "core"
+REPORT_DIR = CORE_DIR / "reports"
+DEFAULT_CONFIG = CORE_DIR / "config.yaml"
+REPORT_DIR.mkdir(parents=True, exist_ok=True)
 
-REPORT_DIR = os.path.join(os.path.dirname(__file__), "..", "core", "reports")
-os.makedirs(REPORT_DIR, exist_ok=True)
+# In-memory scan registry
+# scans[scan_id] = {"id": scan_id, "url": target, "status": "running"|"done", "json_path": str, "html_path": str}
+scans: Dict[str, Dict[str, Any]] = {}
 
-class ScanStatus(BaseModel):
-    scan_id: str
-    target: str
-    started_at: float
-    finished_at: float | None = None
-    state: str = Field(default="running")   # running|finished|error
-    progress: int = Field(default=0)        # best-effort
-    message: str = Field(default="")
-    pages: int = 0
-    forms: int = 0
-    findings: int = 0
-    json_path: str | None = None
-    html_path: str | None = None
-    events: List[str] = Field(default_factory=list)
+# --------------------------------------------------------------------------------------
+# FastAPI app + CORS
+# --------------------------------------------------------------------------------------
+app = FastAPI(title="OWASP Tester API", version="1.0")
 
-RUNS: Dict[str, ScanStatus] = {}
-LOCK = asyncio.Lock()
-
-app = FastAPI(title=API_TITLE)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=FRONTEND_ORIGINS,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-class ScanRequest(BaseModel):
-    url: str
-    config_path: str = os.path.join(os.path.dirname(__file__), "..", "core", "config.yaml")
-    details: bool = True
+# Serve reports folder (so links can be absolute and simple)
+app.mount("/reports", StaticFiles(directory=str(REPORT_DIR)), name="reports")
 
-def _progress_emit(st: ScanStatus, msg: str):
-    st.events.append(f"[{time.strftime('%H:%M:%S')}] {msg}")
-    if len(st.events) > 500:
-        st.events = st.events[-500:]
 
-async def _run_scan_async(scan_id: str, req: ScanRequest):
-    async with LOCK:
-        st = RUNS.get(scan_id)
-    if not st:
-        return
-    _progress_emit(st, f"Starting scan for {req.url}")
-    try:
-        with open(req.config_path, "r", encoding="utf-8") as f:
-            cfg = yaml.safe_load(f) or {}
-        _progress_emit(st, "Config loaded.")
+# --------------------------------------------------------------------------------------
+# Helpers
+# --------------------------------------------------------------------------------------
+def _resolve_scan(scan_id: str) -> Dict[str, Any]:
+    scan = scans.get(scan_id)
+    if not scan:
+        raise HTTPException(status_code=404, detail="Scan not found")
+    return scan
 
-        _progress_emit(st, "Initializing scanner...")
-        result = core.run_scan(req.url, cfg)
 
-        st.pages = result.crawled_pages
-        st.forms = result.discovered_forms
-        st.findings = len(result.findings)
+def _run_scan_task(scan_id: str, target_url: str, config_path: str | None = None):
+    """Worker: run scan and save reports."""
+    cfg_path = str(DEFAULT_CONFIG if not config_path else config_path)
+    cfg = load_config(cfg_path)
+    result = run_scan(target_url, cfg)
+    json_path, html_path = save_report(result, str(REPORT_DIR), report_cfg=cfg.get("report", {}))
 
-        json_path, html_path = core.save_report(result, cfg.get("report", {}).get("out", "reports"), cfg.get("report", {}))
-        st.json_path = json_path
-        st.html_path = html_path
+    scans[scan_id]["status"] = "done"
+    scans[scan_id]["json_path"] = json_path
+    scans[scan_id]["html_path"] = html_path
 
-        _progress_emit(st, f"Reports saved: {json_path} | {html_path}")
-        st.progress = 100
-        st.state = "finished"
-        st.finished_at = time.time()
-        _progress_emit(st, "Scan finished.")
-    except Exception as e:
-        st.state = "error"
-        st.message = f"{type(e).__name__}: {e}"
-        st.finished_at = time.time()
-        _progress_emit(st, f"Scan failed: {st.message}")
 
-@app.get("/healthz")
-def healthz():
-    return {"ok": True, "time": time.time()}
+# --------------------------------------------------------------------------------------
+# Routes
+# --------------------------------------------------------------------------------------
+@app.get("/")
+def root():
+    return {"ok": True, "message": "OWASP Tester API running", "reports_dir": str(REPORT_DIR)}
 
-@app.post("/scan")
-async def start_scan(req: ScanRequest, bg: BackgroundTasks):
-    if not req.url or not req.url.strip():
-        raise HTTPException(status_code=400, detail="url is required")
-    scan_id = uuid.uuid4().hex[:12]
-    st = ScanStatus(
-        scan_id=scan_id,
-        target=req.url.strip(),
-        started_at=time.time(),
-        state="running",
-        progress=5,
-    )
-    RUNS[scan_id] = st
-    bg.add_task(_run_scan_async, scan_id, req)
-    return {"scan_id": scan_id}
+
+@app.post("/scan/start")
+def start_scan(data: Dict[str, Any], background_tasks: BackgroundTasks):
+    """
+    body: {"url": "...", "config_path": "optional/custom/config.yaml"}
+    """
+    target = (data or {}).get("url")
+    if not target:
+        raise HTTPException(status_code=400, detail="Missing 'url'")
+
+    config_path = (data or {}).get("config_path")
+    if config_path:
+        cfg_file = Path(config_path)
+        if not cfg_file.is_file():
+            raise HTTPException(status_code=400, detail=f"Config not found: {config_path}")
+
+    scan_id = str(uuid.uuid4())[:8]
+    scans[scan_id] = {"id": scan_id, "url": target, "status": "running"}
+
+    background_tasks.add_task(_run_scan_task, scan_id, target, config_path)
+    return {"scan_id": scan_id, "status": "running", "target": target}
+
 
 @app.get("/scan/{scan_id}/status")
-async def scan_status(scan_id: str):
-    st = RUNS.get(scan_id)
-    if not st:
-        raise HTTPException(status_code=404, detail="scan not found")
-    return JSONResponse(st.model_dump(), dumps=orjson.dumps)
+def get_status(scan_id: str):
+    """
+    returns: {"id": "...", "url": "...", "status": "running|done", ...}
+    """
+    return _resolve_scan(scan_id)
 
-@app.get("/scan/{scan_id}/stream")
-async def scan_stream(scan_id: str):
-    st = RUNS.get(scan_id)
-    if not st:
-        raise HTTPException(status_code=404, detail="scan not found")
 
-    async def event_gen():
-        last = 0
-        yield f"event: status\ndata: {json.dumps(st.model_dump())}\n\n"
-        while True:
-            await asyncio.sleep(0.7)
-            cur = len(st.events)
-            if cur != last:
-                for i in range(last, cur):
-                    yield f"event: log\ndata: {json.dumps(st.events[i])}\n\n"
-                last = cur
-            yield f"event: status\ndata: {json.dumps({'state': st.state, 'progress': st.progress, 'pages': st.pages, 'forms': st.forms, 'findings': st.findings})}\n\n"
-            if st.state in ("finished", "error"):
-                break
+@app.get("/scan/{scan_id}/links")
+def get_links(scan_id: str):
+    """
+    returns absolute URLs for the frontend buttons.
+    """
+    scan = _resolve_scan(scan_id)
+    html_path = scan.get("html_path")
+    json_path = scan.get("json_path")
+    if not html_path or not json_path:
+        raise HTTPException(status_code=404, detail="Reports not ready yet")
 
-    headers = {"Cache-Control": "no-cache", "Content-Type": "text/event-stream", "Connection": "keep-alive"}
-    return StreamingResponse(event_gen(), headers=headers)
+    base = "http://localhost:8000"
+    html_name = os.path.basename(html_path)
+    json_name = os.path.basename(json_path)
+    return JSONResponse({
+        "scan_id": scan_id,
+        "html_url": f"{base}/reports/{html_name}",
+        "json_url": f"{base}/reports/{json_name}",
+    })
 
-def _read_text(path: Optional[str]) -> str:
-    if not path or not os.path.exists(path):
-        raise HTTPException(status_code=404, detail="report not found")
-    with open(path, "r", encoding="utf-8") as f:
-        return f.read()
-
-@app.get("/scan/{scan_id}/report.json")
-async def report_json(scan_id: str):
-    st = RUNS.get(scan_id)
-    if not st or not st.json_path:
-        raise HTTPException(status_code=404, detail="json report not found (maybe still running?)")
-    txt = _read_text(st.json_path)
-    return PlainTextResponse(txt, media_type="application/json")
 
 @app.get("/scan/{scan_id}/report.html")
-async def report_html(scan_id: str):
-    st = RUNS.get(scan_id)
-    if not st or not st.html_path:
-        raise HTTPException(status_code=404, detail="html report not found (maybe still running?)")
-    txt = _read_text(st.html_path)
-    return HTMLResponse(txt)
+def get_report_html(scan_id: str):
+    scan = _resolve_scan(scan_id)
+    path = scan.get("html_path")
+    if not path or not Path(path).is_file():
+        raise HTTPException(status_code=404, detail="HTML report not found")
+    return FileResponse(path, media_type="text/html")
 
-# Run: uvicorn api_server:app --host 0.0.0.0 --port 8000 --reload
+
+@app.get("/scan/{scan_id}/report.json")
+def get_report_json(scan_id: str):
+    scan = _resolve_scan(scan_id)
+    path = scan.get("json_path")
+    if not path or not Path(path).is_file():
+        raise HTTPException(status_code=404, detail="JSON report not found")
+    return FileResponse(path, media_type="application/json")
